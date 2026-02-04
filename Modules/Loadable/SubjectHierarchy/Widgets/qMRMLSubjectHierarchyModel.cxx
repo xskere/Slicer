@@ -285,11 +285,21 @@ void qMRMLSubjectHierarchyModelPrivate::completePendingDragAndDropReverts(QMap<v
     if (parentItem && parentItem != newParentItem)
     {
       int newIndex = itemDragInfoIt->originalIndexUnderParent;
-      if (parentItem != newParentItem || newIndex != draggedShItem->row())
+      int oldRow = draggedShItem->row();
+      if (parentItem != newParentItem || newIndex != oldRow)
       {
-        // Reparent items
-        QList<QStandardItem*> children = parentItem->takeRow(draggedShItem->row());
-        newParentItem->insertRow(newIndex, children);
+        // Reparent items using beginMoveRows/endMoveRows to preserve selection
+        QModelIndex oldParentIndex = q->indexFromItem(parentItem);
+        QModelIndex newParentIndex = q->indexFromItem(newParentItem);
+        if (q->beginMoveRows(oldParentIndex, oldRow, oldRow, newParentIndex, newIndex))
+        {
+          // Block signals so takeRow/insertRow don't emit their own begin/end signals
+          bool wasBlocked = q->blockSignals(true);
+          QList<QStandardItem*> children = parentItem->takeRow(oldRow);
+          newParentItem->insertRow(newIndex, children);
+          q->blockSignals(wasBlocked);
+          q->endMoveRows();
+        }
       }
     }
 
@@ -1026,11 +1036,21 @@ void qMRMLSubjectHierarchyModel::updateItemFromSubjectHierarchyItem(QStandardIte
     if (parentItem && parentItem != newParentItem)
     {
       int newIndex = this->subjectHierarchyItemIndex(shItemID);
-      if ((newParentItem != nullptr) && (parentItem != newParentItem || newIndex != item->row()))
+      int oldRow = item->row();
+      if ((newParentItem != nullptr) && (parentItem != newParentItem || newIndex != oldRow))
       {
-        // Reparent items
-        QList<QStandardItem*> children = parentItem->takeRow(item->row());
-        newParentItem->insertRow(newIndex, children);
+        // Reparent items using beginMoveRows/endMoveRows to preserve selection
+        QModelIndex oldParentIndex = this->indexFromItem(parentItem);
+        QModelIndex newParentIndex = this->indexFromItem(newParentItem);
+        if (this->beginMoveRows(oldParentIndex, oldRow, oldRow, newParentIndex, newIndex))
+        {
+          // Block signals so takeRow/insertRow don't emit their own begin/end signals
+          bool wasBlocked = this->blockSignals(true);
+          QList<QStandardItem*> children = parentItem->takeRow(oldRow);
+          newParentItem->insertRow(newIndex, children);
+          this->blockSignals(wasBlocked);
+          this->endMoveRows();
+        }
       }
     }
   }
@@ -1664,21 +1684,28 @@ void qMRMLSubjectHierarchyModel::onSubjectHierarchyItemChildrenReordered(vtkIdTy
     if (!childItem)
     {
       qWarning() << Q_FUNC_INFO << ": child item not found by ID" << childItemID;
-      continue;
     }
     QStandardItem* formerParentItem = childItem->parent();
     if (!formerParentItem)
     {
       qWarning() << Q_FUNC_INFO << ": parent not found of item ID" << childItemID;
-      continue;
     }
 
     int formerChildPosition = this->indexFromSubjectHierarchyItem(childItemID).row();
     if (newParentItem != formerParentItem || positionInShNode != formerChildPosition)
     {
-      // Reparent/reorder item in model
-      QList<QStandardItem*> children = formerParentItem->takeRow(formerChildPosition);
-      newParentItem->insertRow(positionInShNode, children);
+      // Reparent/reorder item in model using beginMoveRows/endMoveRows to preserve selection
+      QModelIndex oldParentIndex = this->indexFromItem(formerParentItem);
+      QModelIndex newParentIndex = this->indexFromItem(newParentItem);
+      if (this->beginMoveRows(oldParentIndex, formerChildPosition, formerChildPosition, newParentIndex, positionInShNode))
+      {
+        // Block signals so takeRow/insertRow don't emit their own begin/end signals
+        bool wasBlocked = this->blockSignals(true);
+        QList<QStandardItem*> children = formerParentItem->takeRow(formerChildPosition);
+        newParentItem->insertRow(positionInShNode, children);
+        this->blockSignals(wasBlocked);
+        this->endMoveRows();
+      }
     }
   }
 }
