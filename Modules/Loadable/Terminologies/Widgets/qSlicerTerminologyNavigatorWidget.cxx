@@ -940,11 +940,6 @@ void qSlicerTerminologyNavigatorWidgetPrivate::setCurrentTerminology(QString ter
     }
     if (!lastTerminologyContextNames.isEmpty())
     {
-      if (lastTerminologyContextNames.size() == 1 && lastTerminologyContextNames[0] == terminologyOrColorName)
-      {
-        // Nothing to change
-        return;
-      }
       // Remove the terminology name from the list so that there are no duplicate entries in the list
       lastTerminologyContextNames.removeOne(terminologyOrColorName);
       // Prepend terminology name to the list so that the last used terminology is first
